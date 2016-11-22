@@ -1,3 +1,3 @@
 
 [pga]
-gw54.iu.xsede.org
+gw54.iu.xsede.org  ansible_user=pga

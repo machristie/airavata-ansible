@@ -1,17 +1,15 @@
 ---
 
 - hosts: pga
+  tags: dev-seagrid
   vars:
-      portal_dir: /home/pga/portals/dev-seagrid
-      git_branch: develop
-  remote_user: pga
-  tasks:
-    - name: pull in updates on develop branch
-      git: repo=https://git-wip-us.apache.org/repos/asf/airavata-php-gateway.git
-           dest={{ portal_dir }}
-           version={{ git_branch }}
-      notify:
-        - composer update
-  handlers:
-    - name: composer update
-      composer: command=update working_dir={{ portal_dir }}
+      portal_dir: "{{portals_dir}}/dev-seagrid"
+  roles:
+      - pga
+
+- hosts: pga
+  tags: dev-scigap
+  vars:
+      portal_dir: "{{portals_dir}}/dev-scigap"
+  roles:
+      - pga

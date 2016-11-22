@@ -1,0 +1,4 @@
+portals_dir: /home/pga/portals
+portal_dir: /home/pga/portals/dev-seagrid
+git_branch: develop
+airavata_php_gateway_repo: https://git-wip-us.apache.org/repos/asf/airavata-php-gateway.git
