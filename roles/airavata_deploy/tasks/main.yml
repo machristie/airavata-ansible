@@ -1,0 +1,5 @@
+
+- name: copy new distribution
+  copy: src={{ airavata_dist }} dest={{ local_airavata_dir }}
+  notify: "new distribution"
+  register: new_distribution

@@ -1,0 +1,8 @@
+---
+
+- hosts: local
+  vars:
+      airavata_dist: "/Users/marcus/Documents/Airavata/airavata/modules/distribution/target/apache-airavata-server-0.17-SNAPSHOT-bin.tar.gz"
+      local_airavata_dir: "/Users/marcus/Documents/Airavata/LocalAiravata"
+  roles:
+      - airavata_deploy
