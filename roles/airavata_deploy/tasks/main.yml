@@ -1,5 +1,46 @@
 
 - name: copy new distribution
   copy: src={{ airavata_dist }} dest={{ local_airavata_dir }}
-  notify: "new distribution"
   register: new_distribution
+
+- name: stop the server
+  shell: "{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/airavata-server-stop.sh"
+  register: stop_airavata
+  when: new_distribution.changed
+
+- name: remove old distribution
+  file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT" state=absent
+  when: new_distribution.changed
+
+- name: untar new distribution
+  # unarchive module doesn't like macOS BSD tar
+  command: tar zxf {{ new_distribution.dest }}
+  args:
+    chdir: "{{ local_airavata_dir }}"
+  when: new_distribution.changed
+
+- name: copy airavata-server.properties
+  copy: remote_src=True src="{{ local_airavata_dir }}/airavata-server.properties" dest="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/"
+  notify: "restart airavata"
+
+- name: copy mysql
+  copy: remote_src=True src="{{ local_airavata_dir }}/mysql-connector-java-5.1.40-bin.jar" dest="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/lib/"
+  notify: "restart airavata"
+
+# Temporary workaround for log4j jars (https://issues.apache.org/jira/browse/AIRAVATA-2205)
+- name: remove slf4j-log4j12 jar
+  file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/lib/slf4j-log4j12-1.7.10.jar" state=absent
+  notify: "restart airavata"
+
+- name: remove log4j jar
+  file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/lib/log4j-1.2.17.jar" state=absent
+  notify: "restart airavata"
+
+# TODO: make sure rabbitmq is started
+# Right now I do: brew services restart rabbitmq
+
+- name: start server if not running
+  find: paths={{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/ patterns="server_start_*"
+  register: server_start_file
+  changed_when: server_start_file.matched == 0
+  notify: "restart airavata"

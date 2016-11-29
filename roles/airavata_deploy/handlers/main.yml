@@ -1,36 +1,21 @@
 
+- name: server start file
+  find: paths={{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/ patterns="server_start_*"
+  register: server_start_file
+  listen: "restart airavata"
+
 - name: stop the server
-  shell: "{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/airavata-server-stop.sh -f"
-  listen: "new distribution"
+  shell: "{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/airavata-server-stop.sh"
+  register: stop_airavata
+  listen: "restart airavata"
   ignore_errors: True
+  when: server_start_file.matched == 1
 
-- name: remove old distribution
-  file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT" state=absent
-  listen: "new distribution"
-
-- name: untar new distribution
-  # unarchive module doesn't like macOS BSD tar
-  command: tar zxf {{ new_distribution.dest }}
-  args:
-    chdir: "{{ local_airavata_dir }}"
-  listen: "new distribution"
-
-- name: copy airavata-server.properties
-  copy: remote_src=True src="{{ local_airavata_dir }}/airavata-server.properties" dest="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/"
-  listen: "new distribution"
-
-- name: copy mysql
-  copy: remote_src=True src="{{ local_airavata_dir }}/mysql-connector-java-5.1.40-bin.jar" dest="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/lib/"
-  listen: "new distribution"
-
-- name: remove slf4j-log4j12 jar
-  file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/lib/slf4j-log4j12-1.7.10.jar" state=absent
-  listen: "new distribution"
-
-- name: remove log4j jar
-  file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/lib/log4j-1.2.17.jar" state=absent
-  listen: "new distribution"
+- name: force stop the server
+  shell: "{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/airavata-server-stop.sh -f"
+  listen: "restart airavata"
+  when: stop_airavata|failed
 
 - name: start the server
   shell: "{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/airavata-server-start.sh -d all"
-  listen: "new distribution"
+  listen: "restart airavata"
