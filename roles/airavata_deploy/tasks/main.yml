@@ -2,11 +2,18 @@
 - name: copy new distribution
   copy: src={{ airavata_dist }} dest={{ local_airavata_dir }}
   register: new_distribution
+  notify: "restart airavata"
 
+# TODO Stopping a server, can this be extract and reused with handler?
 - name: stop the server
   shell: "{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/airavata-server-stop.sh"
   register: stop_airavata
   when: new_distribution.changed
+  ignore_errors: True
+
+- name: force stop the server
+  shell: "{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/airavata-server-stop.sh -f"
+  when: stop_airavata|failed
 
 - name: remove old distribution
   file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT" state=absent
