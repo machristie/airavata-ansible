@@ -2,7 +2,11 @@
 
 - hosts: local
   vars:
-      airavata_dist: "/Users/marcus/Documents/Airavata/airavata/modules/distribution/target/apache-airavata-server-0.17-SNAPSHOT-bin.tar.gz"
-      local_airavata_dir: "/Users/marcus/Documents/Airavata/LocalAiravata"
+      airavata_source_dir: "/Users/marcus/Documents/Airavata/airavata"
+      airavata_repo: "https://git-wip-us.apache.org/repos/asf/airavata.git"
+      git_branch: "develop"
+      do_git_pull: true
+      deployment_dir: "/Users/marcus/Documents/Airavata/LocalAiravata"
+      server_name: all
   roles:
       - airavata_deploy

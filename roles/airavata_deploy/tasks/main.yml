@@ -1,53 +1,121 @@
 
+# TODO: Split pull and build out into a separate role
+- name: pull in updates on develop branch
+  git: repo={{ airavata_repo }}
+       dest={{ airavata_source_dir }}
+       version={{ git_branch }}
+  when: do_git_pull
+  register: git_pull
+
+- name: build the distribution
+  command: mvn clean install -DskipTests
+  args:
+      chdir: "{{ airavata_source_dir }}"
+  # TODO: if no changes where pulled in, then we still want to build the dist if it doesn't exist
+  when: git_pull.changed
+
+- name: register the distribution tarball
+  find:
+      paths: "{{ airavata_source_dir }}/modules/distribution/target"
+      patterns: "*-bin.tar.gz"
+      file_type: file
+  register: dist_tarball_file
+
 - name: copy new distribution
-  copy: src={{ airavata_dist }} dest={{ local_airavata_dir }}
+  copy: remote_src=True src={{ dist_tarball_file.files.0.path }} dest={{ deployment_dir }}
   register: new_distribution
   notify: "restart airavata"
 
-# TODO Stopping a server, can this be extract and reused with handler?
+- name: register the currently deployed distribution
+  find:
+      paths: "{{ deployment_dir }}"
+      patterns: "apache-airavata-server-*-SNAPSHOT"
+      file_type: directory
+  register: old_dist_dir
+
+# TODO Stopping a server, can this be extracted and reused with handler?
+# TODO only stop the server if the server is running
+
 - name: stop the server
-  shell: "{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/airavata-server-stop.sh"
+  shell: "{{ old_dist_dir.files.0.path }}/bin/airavata-server-stop.sh"
   register: stop_airavata
-  when: new_distribution.changed
+  when: new_distribution.changed and old_dist_dir.matched == 1
   ignore_errors: True
 
 - name: force stop the server
-  shell: "{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/airavata-server-stop.sh -f"
+  shell: "{{ old_dist_dir.files.0.path }}/bin/airavata-server-stop.sh -f"
   when: stop_airavata|failed
 
+- name: register the backup distribution
+  find:
+      paths: "{{ deployment_dir }}"
+      patterns: "apache-airavata-server-*bk"
+      file_type: directory
+  register: backup_dist_dir
+
+- name: remove old backup
+  file: path="{{ backup_dist_dir.files.0.path }}" state=absent
+  when: new_distribution.changed and backup_dist_dir.matched == 1
+
+- name: backup current distribution
+  command: mv "{{ old_dist_dir.files.0.path }}" "{{ old_dist_dir.files.0.path }}bk"
+  when: new_distribution.changed and old_dist_dir.matched == 1
+
 - name: remove old distribution
-  file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT" state=absent
-  when: new_distribution.changed
+  file: path={{ old_dist_dir.files.0.path }} state=absent
+  when: new_distribution.changed and old_dist_dir.matched == 1
 
 - name: untar new distribution
   # unarchive module doesn't like macOS BSD tar
   command: tar zxf {{ new_distribution.dest }}
   args:
-    chdir: "{{ local_airavata_dir }}"
+    chdir: "{{ deployment_dir }}"
   when: new_distribution.changed
 
+- name: register the new distribution
+  find:
+      paths: "{{ deployment_dir }}"
+      patterns: "apache-airavata-server-*-SNAPSHOT"
+      file_type: directory
+  register: new_dist_dir
+
+# Assume that the deployment directory has the airavata-server.properties file to use
 - name: copy airavata-server.properties
-  copy: remote_src=True src="{{ local_airavata_dir }}/airavata-server.properties" dest="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/"
+  copy: remote_src=True src="{{ deployment_dir }}/airavata-server.properties" dest={{ new_dist_dir.files.0.path }}/bin/
   notify: "restart airavata"
 
+# Assume that the mysql jar is in the deployment directory
+- name: register the mysql jar
+  find:
+      paths: "{{ deployment_dir }}"
+      patterns: "mysql-connector-java-*.jar"
+      file_type: file
+      recurse: no
+  register: mysql_jar
+
 - name: copy mysql
-  copy: remote_src=True src="{{ local_airavata_dir }}/mysql-connector-java-5.1.40-bin.jar" dest="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/lib/"
+  copy: remote_src=True src="{{ mysql_jar.files.0.path }}" dest={{ new_dist_dir.files.0.path }}/lib/
   notify: "restart airavata"
 
 # Temporary workaround for log4j jars (https://issues.apache.org/jira/browse/AIRAVATA-2205)
-- name: remove slf4j-log4j12 jar
-  file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/lib/slf4j-log4j12-1.7.10.jar" state=absent
-  notify: "restart airavata"
+- name: register the log4j jars
+  find:
+      paths: "{{ deployment_dir }}"
+      patterns: "slf4j-log4j12*.jar,log4j*.jar"
+      file_type: file
+      recurse: yes
+  register: log4j_jars
 
-- name: remove log4j jar
-  file: path="{{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/lib/log4j-1.2.17.jar" state=absent
+- name: remove log4j jars
+  file: path={{item.path}} state=absent
   notify: "restart airavata"
+  with_items: "{{ log4j_jars.files }}"
 
 # TODO: make sure rabbitmq is started
-# Right now I do: brew services restart rabbitmq
+# Right now locally I do: brew services restart rabbitmq
 
 - name: start server if not running
-  find: paths={{ local_airavata_dir }}/apache-airavata-server-0.17-SNAPSHOT/bin/ patterns="server_start_*"
+  find: paths={{ new_dist_dir.files.0.path }}/bin/ patterns="server_start_*"
   register: server_start_file
   changed_when: server_start_file.matched == 0
   notify: "restart airavata"
