@@ -11,3 +11,15 @@
       server_name: "api-orch"
   roles:
       - airavata_deploy
+
+# Registry server deployment
+- hosts: dev-airavata
+  vars:
+      airavata_source_dir: "/home/airavata/dev-airavata-source"
+      airavata_repo: "https://git-wip-us.apache.org/repos/asf/airavata.git"
+      git_branch: "develop"
+      do_git_pull: true
+      deployment_dir: "/home/airavata/dev-deployment/registry"
+      server_name: "regserver"
+  roles:
+      - airavata_deploy
