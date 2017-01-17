@@ -7,14 +7,21 @@
   when: do_git_pull
   register: git_pull
 
+- name: check for existing distribution tarball
+  find:
+      paths: "{{ airavata_source_dir }}/modules/distribution/target"
+      patterns: "*-bin.tar.gz"
+      file_type: file
+  register: dist_tarball_file
+
 - name: build the distribution
   command: mvn clean install -DskipTests
   args:
       chdir: "{{ airavata_source_dir }}"
-  # TODO: if no changes where pulled in, then we still want to build the dist if it doesn't exist
-  when: git_pull.changed
+  when: git_pull.changed or dist_tarball_file.matched == 0
+  register: dist_build
 
-- name: register the distribution tarball
+- name: register the built distribution tarball
   find:
       paths: "{{ airavata_source_dir }}/modules/distribution/target"
       patterns: "*-bin.tar.gz"
